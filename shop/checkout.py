@@ -21,6 +21,14 @@ class Order(BaseModel):
     qty: int = 1
 
 
+def validate_order(order: Order) -> str:
+    item = order.item.strip()
+    if not item or order.qty <= 0:
+        log.warning("invalid order item=%s qty=%s", order.item, order.qty)
+        raise HTTPException(status_code=400, detail="invalid order")
+    return item
+
+
 @app.get("/healthz")
 def healthz():
     return {"ok": True}
@@ -28,17 +36,20 @@ def healthz():
 
 @app.post("/checkout")
 def checkout(order: Order):
-    r = client.get(f"{PRICING_URL}/price", params={"item": order.item})
+    item = validate_order(order)
+    r = client.get(f"{PRICING_URL}/price", params={"item": item})
     if r.status_code != 200:
-        log.warning("price lookup failed item=%s status=%s", order.item, r.status_code)
+        log.warning("price lookup failed item=%s status=%s", item, r.status_code)
         raise HTTPException(status_code=502, detail="pricing unavailable")
-    total = round(r.json()["price"] * order.qty, 2)
+    unit_price = r.json()["price"]
+    total = round(unit_price * order.qty, 2)
 
-    p = client.post(f"{PAYMENTS_URL}/charge", json={"amount": total})
-    if p.status_code != 200:
-        log.error("payment failed item=%s total=%s status=%s", order.item, total, p.status_code)
-        raise HTTPException(status_code=502, detail="payment failed")
+    if total >= 5.0:
+        p = client.post(f"{PAYMENTS_URL}/charge", json={"amount": total})
+        if p.status_code != 200:
+            log.error("payment failed item=%s total=%s status=%s", item, total, p.status_code)
+            raise HTTPException(status_code=502, detail="payment failed")
 
     order_id = uuid.uuid4().hex[:8]
-    log.info("order confirmed id=%s item=%s total=%s", order_id, order.item, total)
+    log.info("order confirmed id=%s item=%s unit_price=%s total=%s", order_id, item, unit_price, total)
     return {"order_id": order_id, "status": "confirmed", "total": total}
