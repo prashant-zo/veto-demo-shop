@@ -10,7 +10,7 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message
 log = logging.getLogger("checkout")
 
 PRICING_URL = os.environ.get("PRICING_URL", "http://pricing:8080")
-PAYMENTS_URL = os.environ.get("PAYMENTS_URL", "http://payments:8080")
+PAYMENTS_URL = os.environ.get("PAYMENTS_URL", "http://payments:9090")
 
 app = FastAPI()
 client = httpx.Client(timeout=2.0)
