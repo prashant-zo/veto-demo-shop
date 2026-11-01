@@ -40,5 +40,5 @@ def checkout(order: Order):
         raise HTTPException(status_code=502, detail="payment failed")
 
     order_id = uuid.uuid4().hex[:8]
-    log.info("order confirmed id=%s item=%s total=%s", order_id, order.item, total)
+    log.info("order placed id=%s item=%s qty=%s total=%s", order_id, order.item, order.qty, total)
     return {"order_id": order_id, "status": "confirmed", "total": total}
