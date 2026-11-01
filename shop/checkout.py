@@ -21,6 +21,14 @@ class Order(BaseModel):
     qty: int = 1
 
 
+def charge_order(item: str, total: float) -> str:
+    p = client.post(f"{PAYMENTS_URL}/charge", json={"amount": total})
+    if p.status_code != 200:
+        log.error("payment failed item=%s total=%s status=%s", item, total, p.status_code)
+        raise HTTPException(status_code=502, detail="payment failed")
+    return p.json().get("charge_id", "unknown")
+
+
 @app.get("/healthz")
 def healthz():
     return {"ok": True}
@@ -34,11 +42,7 @@ def checkout(order: Order):
         raise HTTPException(status_code=502, detail="pricing unavailable")
     total = round(r.json()["price"] * order.qty, 2)
 
-    p = client.post(f"{PAYMENTS_URL}/charge", json={"amount": total})
-    if p.status_code != 200:
-        log.error("payment failed item=%s total=%s status=%s", order.item, total, p.status_code)
-        raise HTTPException(status_code=502, detail="payment failed")
-
+    charge_id = charge_order(order.item, total)
     order_id = uuid.uuid4().hex[:8]
-    log.info("order confirmed id=%s item=%s total=%s", order_id, order.item, total)
-    return {"order_id": order_id, "status": "confirmed", "total": total}
+    log.info("order confirmed id=%s item=%s total=%s charge_id=%s", order_id, order.item, total, charge_id)
+    return {"order_id": order_id, "charge_id": charge_id, "status": "confirmed", "total": total}
